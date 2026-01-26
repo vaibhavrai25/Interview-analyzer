@@ -1,5 +1,8 @@
 import multiprocessing
 multiprocessing.freeze_support()
+from analyzer import analyze_text
+from dotenv import load_dotenv
+
 
 
 from fastapi import FastAPI, UploadFile, File
@@ -8,6 +11,10 @@ import tempfile
 import os
 
 app = FastAPI()
+
+load_dotenv()
+
+
 
 model = whisper.load_model("base")
 
@@ -29,3 +36,10 @@ async def transcribe(file: UploadFile = File(...)):
     os.remove(tmp_path)
 
     return {"transcript": text}
+
+@app.post("/analyze")
+async def analyze_transcript(data: dict):
+    transcript = data.get("transcript")
+    result = analyze_text(transcript)
+    return result
+

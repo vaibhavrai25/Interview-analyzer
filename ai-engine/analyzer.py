@@ -15,7 +15,7 @@ ACTION_VERBS = ["built", "created", "developed", "implemented", "designed", "opt
 WEAK_PHRASES = ["i think", "maybe", "probably", "sort of", "kind of"]
 
 CONNECTORS = ["because", "therefore", "however", "so", "then", "while", "although"]
-STAR_WORDS = ["situation", "task", "action", "result"]
+STAR_WORDS = ["situation", "task", "action", "result","team"]
 HEDGES = ["maybe", "perhaps", "might", "could"]
 
 

@@ -5,3 +5,11 @@ uploads
 __pycache__
 .DS_Store
 *.log
+emotion_env
+venv/
+__pycache__/
+.env
+frames/
+temp_*
+*.mp4
+*.wav

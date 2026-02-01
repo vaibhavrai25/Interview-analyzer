@@ -2,13 +2,17 @@ import multiprocessing
 multiprocessing.freeze_support()
 from analyzer import analyze_text
 from dotenv import load_dotenv
-from database import save_report, get_all_reports   
+load_dotenv()
+from database import get_all_interviews as get_all_reports
+from database import save_interview  
 
 
 import shutil
 from analyzer import analyze_text
 from speech_to_text import transcribe_audio
 from report_generator import generate_report
+from video_processor import process_video
+
 
 
 
@@ -84,7 +88,7 @@ async def analyze_audio(file: UploadFile = File(...)):
         print("Report generated")
 
         report = json.loads(json.dumps(report, default=str))
-        save_report(report)
+        save_interview(temp_audio_path, report)
         print("Saved to DB")
 
         os.remove(temp_audio_path)
@@ -99,3 +103,18 @@ async def analyze_audio(file: UploadFile = File(...)):
 @app.get("/reports")
 def fetch_reports():
     return get_all_reports()
+
+@app.post("/analyze-video")
+async def analyze_video(file: UploadFile = File(...)):
+
+    temp_video_path = f"temp_{file.filename}"
+
+    with open(temp_video_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    # 🔥 Full video pipeline
+    final_report = process_video(temp_video_path)
+
+    os.remove(temp_video_path)
+
+    return final_report

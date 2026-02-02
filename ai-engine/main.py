@@ -104,17 +104,32 @@ async def analyze_audio(file: UploadFile = File(...)):
 def fetch_reports():
     return get_all_reports()
 
+from database import save_interview
+
 @app.post("/analyze-video")
 async def analyze_video(file: UploadFile = File(...)):
 
-    temp_video_path = f"temp_{file.filename}"
+    video_path = f"temp_{file.filename}"
 
-    with open(temp_video_path, "wb") as buffer:
+    with open(video_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # 🔥 Full video pipeline
-    final_report = process_video(temp_video_path)
+    print("🎥 Video saved:", video_path)
 
-    os.remove(temp_video_path)
+    report = process_video(video_path)
 
-    return final_report
+    print("📝 Report generated")
+
+    # 🔥 SAVE TO MONGO HERE
+    save_interview(video_path, report)
+
+    print("✅ Saved to MongoDB")
+
+    os.remove(video_path)
+
+    return report
+from database import get_all_interviews
+@app.get("/interviews")
+def fetch_interviews():
+    interviews = get_all_interviews()
+    return {"data": interviews}

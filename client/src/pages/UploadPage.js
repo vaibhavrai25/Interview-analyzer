@@ -22,7 +22,14 @@ const UploadPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 flex flex-col items-center">
-      
+      <a
+        href="/dashboard"
+        className="bg-black text-white px-4 py-2 rounded-lg"
+        style={{ position: 'absolute', top: 20, right: 20 }}>
+         Go to Dashboard
+      </a>
+
+
       {/* Header */}
       <header className="w-full py-6 text-center">
         <h1 className="text-4xl font-bold tracking-tight">

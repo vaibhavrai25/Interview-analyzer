@@ -1,26 +1,41 @@
 import os
 from pymongo import MongoClient
+from dotenv import load_dotenv
 from datetime import datetime
 
-MONGO_URL = os.getenv("MONGO_URL")
-print("Mongo URL in DB file:", MONGO_URL)
+load_dotenv()
 
-assert MONGO_URL is not None, "MONGO_URL NOT FOUND. Dotenv not loaded."
+MONGO_URL = os.getenv("MONGO_URL")
+print("🔥 MONGO_URL FROM ENV:", MONGO_URL)
 
 client = MongoClient(MONGO_URL)
 
-db = client["interview_analyzer"]
-reports_collection = db["reports"]
+print("🔥 DATABASES:", client.list_database_names())
 
+db = client["interview_analyzer"]
+print("🔥 USING DB:", db.name)
+
+reports_collection = db["reports"]
+print("🔥 COLLECTION:", reports_collection.name)
+
+
+import uuid
 
 def save_interview(video_path: str, report: dict):
     document = {
-        "video_path": video_path,
-        "report": report,
-        "created_at": datetime.utcnow()
-    }
+    "interview_id": str(uuid.uuid4()),
+    "video_path": video_path,
+    "report": report,          # 🔥 store FULL report
+    "name": "",                # for future
+    "notes": "",               # for future
+    "created_at": datetime.utcnow()
+}
     reports_collection.insert_one(document)
 
 
+
+
+
 def get_all_interviews():
-    return list(reports_collection.find({}, {"_id": 0}))
+    interviews = list(reports_collection.find({}, {"_id": 0}))
+    return interviews

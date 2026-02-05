@@ -11,14 +11,16 @@ nlp = spacy.load("en_core_web_sm")
 FILLER_WORDS = {"um", "uh", "like", "you know", "so", "actually", "basically"}
 TECH_WORDS = {
     "python", "java", "arduino", "iot", "machine learning",
-    "database", "api", "react", "node", "algorithm", "data structure",
-    "system design", "scalability", "latency", "frontend", "backend"
-}
-ACTION_VERBS = {"built", "created", "developed", "implemented", "designed", "optimized", "managed", "led"}
-WEAK_PHRASES = {"i think", "maybe", "probably", "sort of", "kind of"}
-STAR_WORDS = {"situation", "task", "action", "result", "team"}
-HEDGES = {"maybe", "perhaps", "might", "could"}
-CONNECTORS = {"because", "therefore", "however", "so", "then", "while", "although"}
+    "database", "api", "react", "node", "algorithm", "data structure"
+]
+
+ACTION_VERBS = ["built", "created", "developed", "implemented", "designed", "optimized"]
+WEAK_PHRASES = ["i think", "maybe", "probably", "sort of", "kind of"]
+
+CONNECTORS = ["because", "therefore", "however", "so", "then", "while", "although"]
+STAR_WORDS = ["situation", "task", "action", "result","team"]
+HEDGES = ["maybe", "perhaps", "might", "could"]
+
 
 def analyze_text(text):
     if not text.strip():
@@ -93,7 +95,6 @@ def analyze_text(text):
         "technical_depth_score": tech_score,
         "final_interview_score": final_score,
         "problems_detected": problems,
-        "suggestions": suggestions,
-        "readability": textstat.flesch_reading_ease(text),
-        "total_words": total_words
+        "suggestions": suggestions
     }
+    

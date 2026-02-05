@@ -1,135 +1,93 @@
-import multiprocessing
-multiprocessing.freeze_support()
-from analyzer import analyze_text
-from dotenv import load_dotenv
-load_dotenv()
-from database import get_all_interviews as get_all_reports
-from database import save_interview  
+import os
+from uuid import uuid4
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+import whisper
 
-
-import shutil
-from analyzer import analyze_text
-from speech_to_text import transcribe_audio
-from report_generator import generate_report
+# Your custom modules
+from database import (
+    save_interview, 
+    delete_interview, 
+    update_interview, 
+    get_all_interviews
+)
 from video_processor import process_video
 
-
-
-
-
-from fastapi import FastAPI, UploadFile, File
-import whisper
-import tempfile
-import os
-from fastapi.middleware.cors import CORSMiddleware
-
-
 app = FastAPI()
-print("THIS MAIN IS RUNNING")
+
+# 1. Setup Static Files & CORS
+if not os.path.exists("videos"):
+    os.makedirs("videos")
+app.mount("/videos", StaticFiles(directory="videos"), name="videos")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # NOT "*"
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-load_dotenv()
-
-
-
+# 2. Load Model Once
 model = whisper.load_model("base")
+
+# 🔥 UPDATED: Added is_pinned so the API recognizes it
+class InterviewUpdate(BaseModel):
+    title: str = None
+    notes: str = None
+    is_pinned: bool = None
+
+# --- ROUTES ---
 
 @app.get("/")
 def home():
     return {"message": "AI Engine is running"}
 
-@app.post("/transcribe")
-async def transcribe(file: UploadFile = File(...)):
-    # Save uploaded file temporarily
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        tmp.write(await file.read())
-        tmp_path = tmp.name
-
-    # Transcribe audio
-    result = model.transcribe(tmp_path)
-    text = result["text"]
-
-    os.remove(tmp_path)
-
-    return {"transcript": text}
-
-@app.post("/analyze")
-async def analyze_transcript(data: dict):
-    transcript = data.get("transcript")
-    result = analyze_text(transcript)
-    return result
-
-
-@app.post("/analyze-audio")
-async def analyze_audio(file: UploadFile = File(...)):
-    try:
-        import shutil, os, json
-
-        temp_audio_path = f"temp_{file.filename}"
-
-        with open(temp_audio_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        transcript = transcribe_audio(temp_audio_path)
-        print("Transcript:", transcript)
-
-        analysis = analyze_text(transcript)
-        print("Analysis done")
-
-        report = generate_report(transcript, analysis)
-        print("Report generated")
-
-        report = json.loads(json.dumps(report, default=str))
-        save_interview(temp_audio_path, report)
-        print("Saved to DB")
-
-        os.remove(temp_audio_path)
-
-        return report
-
-    except Exception as e:
-        print("🔥 ERROR:", e)
-        return {"error": str(e)}
-
-
-@app.get("/reports")
-def fetch_reports():
-    return get_all_reports()
-
-from database import save_interview
-
 @app.post("/analyze-video")
-async def analyze_video(file: UploadFile = File(...)):
+async def analyze_video_route(background_tasks: BackgroundTasks, video: UploadFile = File(...)):
+    unique_name = f"{uuid4()}_{video.filename}"
+    video_location = os.path.join("videos", unique_name)
 
-    video_path = f"temp_{file.filename}"
+    with open(video_location, "wb") as buffer:
+        buffer.write(await video.read())
 
-    with open(video_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    def run_pipeline(path):
+        report = process_video(path)
+        save_interview(path, report)
 
-    print("🎥 Video saved:", video_path)
+    background_tasks.add_task(run_pipeline, video_location)
+    return {"message": "Processing started", "video_url": video_location}
 
-    report = process_video(video_path)
-
-    print("📝 Report generated")
-
-    # 🔥 SAVE TO MONGO HERE
-    save_interview(video_path, report)
-
-    print("✅ Saved to MongoDB")
-
-    os.remove(video_path)
-
-    return report
-from database import get_all_interviews
 @app.get("/interviews")
 def fetch_interviews():
-    interviews = get_all_interviews()
+    interviews = []
+    # get_all_interviews now handles the sorted list from database.py
+    for item in get_all_interviews(): 
+        item["_id"] = str(item["_id"])
+        interviews.append(item)
     return {"data": interviews}
+
+# 🔥 NEW: The PUT route to handle Pinning and Renaming
+@app.put("/interview/{interview_id}")
+async def edit_interview(interview_id: str, payload: InterviewUpdate):
+    # Convert Pydantic model to dict and remove fields that weren't sent (None)
+    update_data = {k: v for k, v in payload.dict().items() if v is not None}
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No data provided to update")
+
+    success = update_interview(interview_id, update_data)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="Interview not found")
+        
+    return {"message": "Updated successfully", "updated_fields": list(update_data.keys())}
+
+@app.delete("/interview/{interview_id}")
+def remove_interview(interview_id: str):
+    success = delete_interview(interview_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"message": "Deleted successfully"}

@@ -5,18 +5,22 @@ const BASE_URL = "http://localhost:8000";
  * Uploads an interview video to the AI Engine for multimodal analysis.
  * @param {File} file - The video file from the input field
  */
-export const uploadVideo = async (file) => {
+export const uploadVideo = async (file, title, interviewType) => {
   const formData = new FormData();
   
-  // 🔥 FIX: Field name must match the FastAPI parameter name (video)
+  // 🚀 File must match the FastAPI parameter name (video)
   formData.append("video", file);
+
+  // 🚀 Append new metadata fields
+  // These will be received by your FastAPI endpoint
+  formData.append("title", title);
+  formData.append("interview_type", interviewType);
 
   try {
     const response = await fetch(`${BASE_URL}/analyze-video`, {
       method: "POST",
       body: formData,
-      // Note: Do NOT set Content-Type header manually; 
-      // the browser will set it automatically with the boundary string.
+      // Reminder: Browser sets Content-Type with boundary automatically
     });
 
     if (!response.ok) {
@@ -56,3 +60,4 @@ export const updateInterview = async (id, payload) => {
   });
   return response.json();
 };
+

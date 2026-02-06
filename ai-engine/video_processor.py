@@ -9,29 +9,39 @@ from speech_to_text import transcribe_audio
 from emotion_summary import summarize_emotions
 from qa_extractor import extract_qa_pairs
 from analyzer import analyze_text
+from database import update_interview_status # 🔥 Ensure this is in database.py
 
-def process_video(video_path):
+def process_video(video_path, interview_id):
     audio_path = None
     frames_folder = None
     
     try:
-        # Ensure the video actually exists
         if not os.path.exists(video_path):
             print(f"❌ Error: Video file not found at {video_path}")
             return None
 
-        # 1. 🖼️ Generate Dashboard Thumbnail (PRO FIX)
-        # Creating a .jpg so the dashboard loads instantly without video preloading
-        thumb_path = video_path.rsplit(".", 1)[0] + "_thumb.jpg"
+        # 1. ⏱️ Calculate Duration & Generate Thumbnail
         cap = cv2.VideoCapture(video_path)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        duration_seconds = frame_count / fps if fps > 0 else 0
+        duration_str = f"{int(duration_seconds // 60)}:{int(duration_seconds % 60):02d}"
+        
+        # Save Thumbnail
+        thumb_path = video_path.rsplit(".", 1)[0] + "_thumb.jpg"
         ret, frame = cap.read()
         if ret:
             cv2.imwrite(thumb_path, frame)
         cap.release()
 
+        # Update initial metadata
+        update_interview_status(interview_id, "Transcribing...", duration=duration_str)
+
         # 2. 🎙️ Audio & Transcript
         audio_path = extract_audio_from_video(video_path)
         transcript = transcribe_audio(audio_path)
+        
+        update_interview_status(interview_id, "Analyzing Q&A...")
 
         # 3. ✍️ Q&A Extraction & Text Analysis
         qa_pairs = extract_qa_pairs(transcript)
@@ -44,6 +54,8 @@ def process_video(video_path):
                 "analysis": analysis
             })
 
+        update_interview_status(interview_id, "Analyzing Emotions...")
+
         # 4. 🎭 Emotion Analysis
         frames_folder = extract_frames_from_video(video_path)
         raw_emotions = analyze_emotions_from_frames(frames_folder)
@@ -51,6 +63,7 @@ def process_video(video_path):
 
         # 5. 🚀 Final Output
         return {
+            "duration": duration_str,
             "transcript": transcript,
             "qa_analysis": qa_analysis,
             "emotion_analysis": emotion_report
@@ -58,22 +71,14 @@ def process_video(video_path):
 
     except Exception as e:
         print(f"🔥 PIPELINE CRASHED: {e}")
+        update_interview_status(interview_id, "Error in Analysis")
         return None
     
     finally:
-        # 🧹 ROBUST CLEANUP
-        # We wrap this in a small delay to let Windows release file locks
         time.sleep(1) 
-        
         if audio_path and os.path.exists(audio_path):
-            try:
-                os.remove(audio_path)
-            except Exception as e:
-                print(f"⚠️ Could not delete audio: {e}")
-
+            try: os.remove(audio_path)
+            except: pass
         if frames_folder and os.path.exists(frames_folder):
-            try:
-                shutil.rmtree(frames_folder)
-            except Exception as e:
-                # Often happens on Windows if a process is still closing
-                print(f"⚠️ Could not delete frames folder: {e}")
+            try: shutil.rmtree(frames_folder)
+            except: pass

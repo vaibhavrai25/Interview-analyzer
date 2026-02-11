@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import UploadPage from "./pages/UploadPage";
 import AnalysisPage from "./pages/AnalysisPage";
+import ComparisonPage from "./pages/ComparisonPage";
 
 // Optional: You can add a Navbar here so it shows on every page
 // import Navbar from "./components/Navbar";
@@ -25,6 +26,8 @@ function App() {
 
         {/* Catch-all for 404 errors */}
         <Route path="*" element={<div className="p-10 text-center">Page Not Found</div>} />
+
+        <Route path="/compare/:id1/:id2" element={<ComparisonPage />} />
       </Routes>
     </BrowserRouter>
   );

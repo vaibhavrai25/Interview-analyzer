@@ -4,14 +4,14 @@ import {
   PlayCircle, Calendar, ChevronRight, Loader2, 
   Trash2, Edit3, Pin, PinOff, X, Check, Search,
   TrendingUp, Award, Zap, Cpu, Briefcase, Code, 
-  Sparkles, Share2, Clock, FileText, CheckSquare, Square
+  Sparkles, Share2, Clock, FileText, CheckSquare, Square, Diff
 } from "lucide-react";
 import { 
   LineChart, Line, BarChart, Bar, XAxis, YAxis, 
   Tooltip, ResponsiveContainer, CartesianGrid, Legend 
 } from 'recharts';
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable'; // 🔥 Changed to functional import
+import autoTable from 'jspdf-autotable'; 
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -38,8 +38,8 @@ export default function Dashboard() {
     }
   }, []);
 
-  // Analytics Logic
   const sortedData = [...data].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  
   const trendData = sortedData.slice(-10).map((item, index) => ({
     name: `Int. ${index + 1}`,
     score: item.analysis?.[0]?.analysis?.final_interview_score || 0
@@ -61,10 +61,21 @@ export default function Dashboard() {
   ];
 
   const techKeywords = ["react", "node", "python", "mongodb", "api", "database", "java", "oops"];
+
+  // 🔥 FIXED: Keyword Counts logic to handle Array and String transcript formats
   const keywordCounts = techKeywords.map(word => {
     const count = data.reduce((acc, item) => {
       const regex = new RegExp(`\\b${word}\\b`, 'gi');
-      return acc + (item.transcript?.match(regex)?.length || 0);
+      
+      // If transcript is new Array format, join text segments first
+      let fullText = "";
+      if (Array.isArray(item.transcript)) {
+        fullText = item.transcript.map(seg => seg.text).join(" ");
+      } else if (typeof item.transcript === "string") {
+        fullText = item.transcript;
+      }
+
+      return acc + (fullText.match(regex)?.length || 0);
     }, 0);
     return { name: word.toUpperCase(), count };
   }).sort((a, b) => b.count - a.count);
@@ -73,7 +84,6 @@ export default function Dashboard() {
     item.title?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // --- ACTIONS ---
   const toggleSelect = (e, id) => {
     e.stopPropagation();
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -86,11 +96,14 @@ export default function Dashboard() {
     alert("Shareable link copied to clipboard!");
   };
 
-  // 🔥 FIXED: Export Handler with jsPDF and autoTable
+  const handleCompare = () => {
+    if (selectedIds.length !== 2) return;
+    navigate(`/compare/${selectedIds[0]}/${selectedIds[1]}`);
+  };
+
   const handleExport = () => {
     const doc = new jsPDF();
     const selectedInterviews = data.filter(item => selectedIds.includes(item.interview_id));
-
     doc.setFontSize(22);
     doc.text("Interview Preparation Portfolio", 14, 20);
     doc.setFontSize(12);
@@ -99,17 +112,13 @@ export default function Dashboard() {
 
     selectedInterviews.forEach((interview, index) => {
       if (index > 0) doc.addPage();
-      
       const analysis = interview.analysis?.[0]?.analysis || {};
-      
       doc.setFontSize(18);
       doc.setTextColor(0);
       doc.text(`${index + 1}. ${interview.title || "Untitled Session"}`, 14, 45);
-      
       doc.setFontSize(10);
       doc.text(`Type: ${interview.interview_type} | Duration: ${interview.duration}`, 14, 52);
 
-      // Summary Table using functional autoTable
       autoTable(doc, {
         startY: 60,
         head: [['Metric', 'Score / 10']],
@@ -123,13 +132,10 @@ export default function Dashboard() {
         headStyles: { fillColor: [37, 99, 235] }
       });
 
-      // Suggestions Section
       doc.setFontSize(14);
       doc.text("Key AI Suggestions:", 14, doc.lastAutoTable.finalY + 15);
-      
       const suggestions = analysis.suggestions || ["No suggestions available."];
       let yPos = doc.lastAutoTable.finalY + 22;
-      
       suggestions.slice(0, 5).forEach(s => {
         doc.setFontSize(10);
         const splitText = doc.splitTextToSize(`• ${s}`, 180);
@@ -137,7 +143,6 @@ export default function Dashboard() {
         yPos += (splitText.length * 5);
       });
     });
-
     doc.save(`Interview_Portfolio_${new Date().getTime()}.pdf`);
     setSelectedIds([]); 
   };
@@ -192,7 +197,6 @@ export default function Dashboard() {
       setData(itvs); 
       setLoading(false); 
     });
-
     let interval;
     if (location.state?.processing || isProcessing) {
         interval = setInterval(async () => {
@@ -219,7 +223,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-50 p-6 md:p-12 pb-32">
       <div className="max-w-7xl mx-auto">
         
-        {/* --- Analytics Row --- */}
+        {/* Analytics Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           {stats.map((stat, i) => (
             <div key={i} className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4">
@@ -272,89 +276,46 @@ export default function Dashboard() {
             <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Your Interviews</h1>
             <p className="text-gray-500 mt-2 font-medium">Review and manage your AI performance reports.</p>
           </div>
-
           <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
             <div className="relative w-full md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input
-                type="text"
-                placeholder="Search interviews..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm transition-all"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+              <input type="text" placeholder="Search interviews..." className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
-            <Link to="/" className="bg-blue-600 text-white px-8 py-2.5 rounded-full font-bold shadow-lg hover:bg-blue-700 transition w-full md:w-auto text-center">
-              + New Interview
-            </Link>
+            <Link to="/" className="bg-blue-600 text-white px-8 py-2.5 rounded-full font-bold shadow-lg hover:bg-blue-700 transition w-full md:w-auto text-center">+ New Interview</Link>
           </div>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredData.map((item) => (
-            <div 
-              key={item._id} 
-              className={`group bg-white rounded-3xl shadow-sm overflow-hidden border-2 transition-all duration-300 relative ${item.is_pinned ? 'border-blue-500 shadow-md' : 'border-transparent hover:border-gray-200'} ${selectedIds.includes(item.interview_id) ? 'ring-4 ring-blue-600/20 border-blue-600' : ''}`}
-            >
+            <div key={item._id} className={`group bg-white rounded-3xl shadow-sm overflow-hidden border-2 transition-all duration-300 relative ${item.is_pinned ? 'border-blue-500 shadow-md' : 'border-transparent hover:border-gray-200'} ${selectedIds.includes(item.interview_id) ? 'ring-4 ring-blue-600/20 border-blue-600' : ''}`}>
               {item.status && item.status !== "Completed" && (
                 <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-[70] flex flex-col items-center justify-center p-8 text-center">
                   <Loader2 className="animate-spin text-blue-600 mb-4" size={32} />
                   <p className="font-black text-slate-800 text-lg">{item.status}</p>
                 </div>
               )}
-
               <div className="absolute top-3 left-3 z-[60] flex gap-2">
-                <button 
-                  onClick={(e) => toggleSelect(e, item.interview_id)}
-                  className={`p-2 rounded-full shadow-lg backdrop-blur-md transition-all ${selectedIds.includes(item.interview_id) ? 'bg-blue-600 text-white' : 'bg-white/90 text-gray-500 hover:bg-white border border-gray-100'}`}
-                >
+                <button onClick={(e) => toggleSelect(e, item.interview_id)} className={`p-2 rounded-full shadow-lg backdrop-blur-md transition-all ${selectedIds.includes(item.interview_id) ? 'bg-blue-600 text-white' : 'bg-white/90 text-gray-500 hover:bg-white border border-gray-100'}`}>
                   {selectedIds.includes(item.interview_id) ? <CheckSquare size={18} /> : <Square size={18} />}
                 </button>
               </div>
-
               <div className="absolute top-3 right-3 z-[60] flex gap-2">
-                <button onClick={(e) => handleShare(e, item.interview_id)} className="p-2 rounded-full bg-white/90 text-gray-500 hover:text-blue-600 shadow-sm transition-all border border-gray-100">
-                  <Share2 size={18} />
-                </button>
-                <button 
-                  onClick={(e) => togglePin(e, item.interview_id, item.is_pinned)}
-                  className={`p-2 rounded-full shadow-sm backdrop-blur-md transition-all border border-gray-100 ${item.is_pinned ? 'bg-blue-600 text-white' : 'bg-white/90 text-gray-500 hover:bg-white'}`}
-                >
-                  {item.is_pinned ? <PinOff size={18} /> : <Pin size={18} />}
-                </button>
+                <button onClick={(e) => handleShare(e, item.interview_id)} className="p-2 rounded-full bg-white/90 text-gray-500 hover:text-blue-600 shadow-sm transition-all border border-gray-100"><Share2 size={18} /></button>
+                <button onClick={(e) => togglePin(e, item.interview_id, item.is_pinned)} className={`p-2 rounded-full shadow-sm backdrop-blur-md transition-all border border-gray-100 ${item.is_pinned ? 'bg-blue-600 text-white' : 'bg-white/90 text-gray-500 hover:bg-white'}`}>{item.is_pinned ? <PinOff size={18} /> : <Pin size={18} />}</button>
               </div>
-
               <div className="relative aspect-video bg-slate-900 overflow-hidden">
                 <div className="absolute bottom-3 left-3 z-40 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-2 border border-white/20">
                   {item.interview_type === "Technical" ? <Code size={14} className="text-blue-400" /> : <Briefcase size={14} className="text-amber-400" />}
                   <span className="text-[10px] font-bold text-white uppercase tracking-widest">{item.interview_type || "General"}</span>
                 </div>
-                
                 <div className="absolute bottom-3 right-3 z-40 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg flex items-center gap-1.5 border border-white/10">
-                  <Clock size={12} className="text-white/70" />
-                  <span className="text-[10px] font-bold text-white tracking-tighter">{item.duration || "0:00"}</span>
+                  <Clock size={12} className="text-white/70" /><span className="text-[10px] font-bold text-white tracking-tighter">{item.duration || "0:00"}</span>
                 </div>
-
-                <video 
-                  src={`${API_BASE}/${item.video_path}#t=0.5`} 
-                  className="w-full h-full object-cover opacity-80" 
-                  preload="metadata"
-                  muted
-                />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <PlayCircle className="text-white/40 group-hover:text-white transition-colors" size={48} />
-                </div>
+                <video src={`${API_BASE}/${item.video_path}#t=0.5`} className="w-full h-full object-cover opacity-80" preload="metadata" muted />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><PlayCircle className="text-white/40 group-hover:text-white transition-colors" size={48} /></div>
               </div>
-
               <div className="p-6">
-                <div className="flex items-center text-gray-400 text-xs mb-3 gap-2">
-                  <Calendar size={14} />
-                  {new Date(item.created_at).toLocaleDateString()}
-                  <button onClick={(e) => handleDelete(e, item.interview_id)} className="ml-auto p-1.5 hover:text-red-500 transition-colors">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-                
+                <div className="flex items-center text-gray-400 text-xs mb-3 gap-2"><Calendar size={14} />{new Date(item.created_at).toLocaleDateString()}<button onClick={(e) => handleDelete(e, item.interview_id)} className="ml-auto p-1.5 hover:text-red-500 transition-colors"><Trash2 size={16} /></button></div>
                 <div className="mb-4">
                   {editingId === item.interview_id ? (
                     <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-lg border border-blue-200">
@@ -368,25 +329,17 @@ export default function Dashboard() {
                     </h3>
                   )}
                 </div>
-
                 <div className="mb-6 flex items-start gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <Sparkles size={14} className="text-purple-500 mt-1 shrink-0" />
-                  <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2 italic">
-                    {item.analysis?.[0]?.analysis?.suggestions?.[0] || "Review the full report for targeted AI feedback."}
-                  </p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2 italic">{item.analysis?.[0]?.analysis?.suggestions?.[0] || "Review the full report for targeted AI feedback."}</p>
                 </div>
-                
-                <button
-                  onClick={() => navigate(`/analysis/${item.interview_id}`, { state: { analysis: item, videoUrl: `${API_BASE}/${item.video_path}` } })}
-                  className="w-full flex items-center justify-center gap-2 bg-slate-900 text-white py-3.5 rounded-2xl hover:bg-blue-600 transition-all font-bold shadow-sm"
-                >
-                  View Full Report <ChevronRight size={18} />
-                </button>
+                <button onClick={() => navigate(`/analysis/${item.interview_id}`, { state: { analysis: item, videoUrl: `${API_BASE}/${item.video_path}` } })} className="w-full flex items-center justify-center gap-2 bg-slate-900 text-white py-3.5 rounded-2xl hover:bg-blue-600 transition-all font-bold shadow-sm">View Full Report <ChevronRight size={18} /></button>
               </div>
             </div>
           ))}
         </div>
 
+        {/* --- DYNAMIC FLOATING TOOLBAR --- */}
         {selectedIds.length > 0 && (
           <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-8 py-5 rounded-[2.5rem] shadow-2xl z-[100] flex items-center gap-8 border border-white/10 animate-in fade-in slide-in-from-bottom-5">
             <div className="flex flex-col">
@@ -394,21 +347,26 @@ export default function Dashboard() {
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Selected</span>
             </div>
             <div className="h-8 w-px bg-white/10" />
+            
+            {selectedIds.length === 2 && (
+              <button onClick={handleCompare} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-2.5 rounded-2xl flex items-center gap-2 font-bold text-sm transition-all shadow-lg shadow-indigo-500/20">
+                <Diff size={18}/> Compare Sessions
+              </button>
+            )}
+
+            <button onClick={handleExport} className="hover:text-blue-400 flex items-center gap-2 font-bold text-sm transition-colors">
+              <FileText size={18}/> Export
+            </button>
+
             <button onClick={handleBulkDelete} className="text-rose-400 hover:text-rose-300 flex items-center gap-2 font-bold text-sm transition-colors">
-              <Trash2 size={18}/> Delete All
+              <Trash2 size={18}/> Delete
             </button>
-            <button 
-              onClick={handleExport}
-              className="bg-blue-600 hover:bg-blue-500 px-6 py-2.5 rounded-2xl flex items-center gap-2 font-bold text-sm shadow-lg shadow-blue-500/20 transition-all"
-            >
-              <FileText size={18}/> Export Portfolio
-            </button>
+            
             <button onClick={() => setSelectedIds([])} className="text-slate-400 hover:text-white transition-colors">
               <X size={20} />
             </button>
           </div>
         )}
-
       </div>
     </div>
   );

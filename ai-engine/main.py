@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import whisper
 
+
 # Your custom modules
 from database import (
     save_interview, 
@@ -125,3 +126,45 @@ def remove_interview(interview_id: str):
     if not success:
         raise HTTPException(status_code=404, detail="Not found")
     return {"message": "Deleted successfully"}
+
+
+
+# --- JARVIS MENTOR SCHEMAS ---
+class ChatRequest(BaseModel):
+    interview_id: str
+    query: str
+    timestamp: float
+
+@app.post("/mentor/chat")
+async def mentor_chat(req: ChatRequest):
+    # 1. Fetch the specific interview data
+    report = reports_collection.find_one({"interview_id": req.interview_id})
+    if not report:
+        raise HTTPException(status_code=404, detail="Interview session not found")
+
+    # 2. Extract Transcript Context
+    # We look for segments within a 15-second window of the current timestamp
+    transcript = report.get("transcript", [])
+    relevant_segments = [
+        seg["text"] for seg in transcript 
+        if abs(seg["start"] - req.timestamp) < 15
+    ]
+    context_text = " ".join(relevant_segments)
+
+    # 3. Simulate NexusMind RAG Logic
+    # In a full Jarvis integration, this would query your knowledge graph
+    # for technical documentation or MNNIT-specific placement resources.
+    ai_feedback = f"At {int(req.timestamp // 60)}:{int(req.timestamp % 60):02d}, you were discussing: '{context_text}'. "
+    
+    # 🧪 Example AI Response Logic (Replace with LLM call)
+    if "recursion" in req.query.lower():
+        response = ai_feedback + "To improve this, emphasize the 'Base Case' and 'Recursive Step' clearly. Check out the NexusMind DSA roadmap for more."
+    elif "mern" in req.query.lower():
+        response = ai_feedback + "Good points on the MERN stack. I suggest mentioning 'Redux' or 'Context API' for state management here."
+    else:
+        response = ai_feedback + "Your explanation is solid, but try to use the STAR method to structure the impact of your actions."
+
+    return {
+        "answer": response,
+        "resources": ["https://react.dev", "MNNIT Engineering Placement Portal"]
+    }

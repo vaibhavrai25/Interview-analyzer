@@ -9,7 +9,7 @@ from speech_to_text import transcribe_audio
 from emotion_summary import summarize_emotions
 from qa_extractor import extract_qa_pairs
 from analyzer import analyze_text
-from database import update_interview_status # 🔥 Ensure this is in database.py
+from database import update_interview_status
 
 def process_video(video_path, interview_id):
     audio_path = None
@@ -27,7 +27,6 @@ def process_video(video_path, interview_id):
         duration_seconds = frame_count / fps if fps > 0 else 0
         duration_str = f"{int(duration_seconds // 60)}:{int(duration_seconds % 60):02d}"
         
-        # Save Thumbnail
         thumb_path = video_path.rsplit(".", 1)[0] + "_thumb.jpg"
         ret, frame = cap.read()
         if ret:
@@ -37,14 +36,18 @@ def process_video(video_path, interview_id):
         # Update initial metadata
         update_interview_status(interview_id, "Transcribing...", duration=duration_str)
 
-        # 2. 🎙️ Audio & Transcript
+        # 2. 🎙️ Audio & Timestamped Transcript
         audio_path = extract_audio_from_video(video_path)
-        transcript = transcribe_audio(audio_path)
+        # 🔥 Now returns a list of segments: [{"start": 0.0, "end": 2.0, "text": "..."}, ...]
+        transcript_segments = transcribe_audio(audio_path)
+        
+        # Create a full string version for Q&A extraction
+        full_transcript_text = " ".join([seg["text"] for seg in transcript_segments])
         
         update_interview_status(interview_id, "Analyzing Q&A...")
 
         # 3. ✍️ Q&A Extraction & Text Analysis
-        qa_pairs = extract_qa_pairs(transcript)
+        qa_pairs = extract_qa_pairs(full_transcript_text)
         qa_analysis = []
         for qa in qa_pairs:
             analysis = analyze_text(qa["answer"])
@@ -64,7 +67,7 @@ def process_video(video_path, interview_id):
         # 5. 🚀 Final Output
         return {
             "duration": duration_str,
-            "transcript": transcript,
+            "transcript": transcript_segments, # 🔥 Saved as interactive segments
             "qa_analysis": qa_analysis,
             "emotion_analysis": emotion_report
         }

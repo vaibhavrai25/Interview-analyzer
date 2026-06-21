@@ -1,0 +1,16 @@
+node_modules/
+venv/
+emotion_env/
+videos/
+frames/
+__pycache__/
+.env
+.DS_Store
+*.log
+temp_*
+*.mp4
+*.wav
+*.webm
+*.jpg
+*.jpeg
+*.png

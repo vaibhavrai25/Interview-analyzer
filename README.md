@@ -92,11 +92,16 @@ The frontend is a **React** application featuring a clean, professional SaaS aes
 ---
 
 ## 📊 Current Status
-**Status:** Beta Release / Production Ready (Approx 85% Complete)
+**Status:** Beta Release(Approx 85% Complete)
 
 **Primary Focus:** Cloud deployment, media storage lifecycle (Cloudinary auto-cleanup), and production Razorpay key migration.
 
 ---
+
+## Deployment Constraints
+1. **Memory Limits:** The local ML pipeline (Whisper, OpenCV) requires at least 2GB-4GB RAM and will instantly crash standard 512MB free-tier cloud containers like Render.
+
+2. **Storage Ephemerality:** Cloud hosts wipe local disk storage on restart, so heavy video/audio processing must be offloaded to persistent storage (e.g., S3, Cloudinary) to prevent server exhaustion.
 
 **Built By** Vaibhav Rai  
 *AI Interview Analyzer © 2026*

@@ -228,9 +228,10 @@ async def health_check():
 async def gemini_health_check():
     """Check if Gemini API is accessible and configured correctly."""
     import websockets
+    import asyncio
     
     gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    gemini_model = os.getenv("GEMINI_LIVE_MODEL", "gemini-3.1-flash-live-preview")
+    gemini_model = os.getenv("GEMINI_LIVE_MODEL", "gemini-2.0-flash")
     
     if not gemini_api_key:
         return {
@@ -247,7 +248,6 @@ async def gemini_health_check():
     test_url = f"{gemini_ws_url}?key={gemini_api_key}"
     
     try:
-        # Try to connect for 5 seconds max
         ws = await asyncio.wait_for(
             websockets.connect(test_url, ping_interval=None, ping_timeout=None),
             timeout=5
@@ -720,6 +720,15 @@ def run_pipeline(path: str, interview_id: str):
     except Exception as e:
         print(f"Pipeline Error: {e}")
         update_interview_status(interview_id, f"Error: {str(e)}")
+    finally:
+        # PRODUCTION REMOVAL BLUEPRINT: Ephemeral cleanup execution loop
+        # Instantly completely sweeps video segments out of Render storage limits.
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+                print(f"Render local ephemeral workspace video file cleaned up successfully: {path}")
+            except Exception as e:
+                print(f"Render local storage cleanup warning: {e}")
 
 
 @app.post("/analyze-video")

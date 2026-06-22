@@ -162,6 +162,22 @@ def infer_role_profile(role: str, interview_type: str = "", topics: str = ""):
         "style": "Adapt questions to the candidate resume and role, with one specific follow-up at a time."
     }
 
+def sanitize_resume_context(raw_text: str, max_chars: int = 2000) -> str:
+    """
+    Surgically cleans the resume text to prevent WebSocket context overload.
+    Strips weird unicode, massive line breaks, and limits the token footprint.
+    """
+    if not raw_text:
+        return "No resume context provided."
+    
+    # Remove massive whitespaces, tabs, and newlines
+    sanitized = re.sub(r'\s+', ' ', raw_text)
+    
+    # Remove non-ascii characters that sometimes break strict JSON parsers over WS
+    sanitized = sanitized.encode('ascii', 'ignore').decode('ascii')
+    
+    return sanitized.strip()[:max_chars]
+
 def build_gemini_instructions(req: GeminiLiveSessionRequest) -> str:
     company = req.company or "the target organization"
     role = req.role or "Candidate"
@@ -174,6 +190,7 @@ def build_gemini_instructions(req: GeminiLiveSessionRequest) -> str:
     )
 
     resume_highlights = extract_resume_highlights(req.resume_context)
+    safe_full_resume = sanitize_resume_context(req.resume_context)
 
     return f"""
 You are Jarvis, a realistic human interviewer.
@@ -194,7 +211,7 @@ Role-specific interview strategy:
 {role_profile["style"]}
 
 Full candidate resume/context:
-{req.resume_context[:4000] if req.resume_context else "No resume context provided."}
+{safe_full_resume}
 
 Critical conversation rules:
 - Be fast and concise.

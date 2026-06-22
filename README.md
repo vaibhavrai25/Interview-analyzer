@@ -100,3 +100,8 @@ The frontend is a **React** application featuring a clean, professional SaaS aes
 
 **Built By** Vaibhav Rai  
 *AI Interview Analyzer © 2026*
+
+
+
+
+

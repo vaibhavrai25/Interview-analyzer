@@ -36,7 +36,7 @@ def analyze_code(code):
         )
         return response.choices[0].message.content
     except Exception as e:
-        print(f"❌ Groq Code Analysis Error: {e}")
+        print(f" Groq Code Analysis Error: {e}")
         return f"Code analysis unavailable: {str(e)}"
 
 def analyze_text(text):
@@ -94,7 +94,7 @@ def analyze_text(text):
         }
         
     except Exception as e:
-        print(f"❌ Groq Text Analysis Error: {e}")
+        print(f" Groq Text Analysis Error: {e}")
         # Robust fallback if AI fails
         return {
             "communication_score": 5,

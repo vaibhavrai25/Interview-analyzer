@@ -3,7 +3,7 @@ def generate_report(transcript: str, analysis: dict, emotion_report: dict = None
     Formats analyzer output into a professional report structure.
     Handles missing keys gracefully to prevent API crashes.
     """
-    # Use .get() to provide default values (0 for scores, empty lists for text)
+    
     report = {
         "transcript": transcript or "No transcript available",
         "scores": {

@@ -62,12 +62,12 @@ async def _get_real_ai_response(context, query, scores, interview_id):
         )
         return answer
     except Exception as e:
-        print(f"❌ Groq Mentor Error: {e}")
+        print(f" Groq Mentor Error: {e}")
         return "Neural link temporarily unstable. Please try again."
 
 @router.post("/mentor/chat")
 async def mentor_chat(req: ChatRequest):
-    # 🔥 FIXED: Changed find_findOne to find_one
+    
     report = reports_collection.find_one({"interview_id": req.interview_id})
     if not report:
         raise HTTPException(status_code=404, detail="Session not found")

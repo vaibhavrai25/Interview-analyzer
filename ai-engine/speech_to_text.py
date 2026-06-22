@@ -22,7 +22,7 @@ def transcribe_audio(audio_path: str):
         # fp16=False is necessary if you are running on a CPU
         result = model.transcribe(audio_path, fp16=(device == "cuda"))
         
-        # 🔥 Extract segments with timestamps for interactive UI
+        #  Extract segments with timestamps for interactive UI
         segments = []
         for segment in result.get("segments", []):
             segments.append({
@@ -33,5 +33,5 @@ def transcribe_audio(audio_path: str):
             
         return segments
     except Exception as e:
-        print(f"❌ Whisper Error: {e}")
+        print(f" Whisper Error: {e}")
         return []

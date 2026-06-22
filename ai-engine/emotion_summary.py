@@ -21,7 +21,7 @@ def summarize_emotions(frame_emotions, fps=1):
     # 2. Dominant Emotion
     dominant = counts.most_common(1)[0][0]
 
-    # 3. 📊 NEW: Time-Series Timeline (For the Recharts Chart)
+    # 3.  NEW: Time-Series Timeline (For the Recharts Chart)
     # This creates a data point for every second so the chart has a 'path'
     timeline_data = {}
     ALL_EMOTIONS = ["happy", "neutral", "sad", "surprise", "angry", "disgust", "fear"]
@@ -67,7 +67,7 @@ def summarize_emotions(frame_emotions, fps=1):
     return {
         "dominant_emotion": dominant,
         "global_percentages": global_percentages,
-        "emotion_percentages": timeline_data,  # 🔥 This is what the chart uses
+        "emotion_percentages": timeline_data,  #  This is what the chart uses
         "emotional_stability": max(0, stability),
         "confidence_score": min(100, confidence),
         "stress_timeline": [

@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-# 🔥 FIX: Import the new SDK correctly
+
 from google import genai
 from google.genai import types
 
@@ -30,7 +30,7 @@ def analyze_code(code):
     """
     
     try:
-        # 🔥 FIX: Use the new SDK syntax (models.generate_content)
+        
         response = client.models.generate_content(
             model="gemini-1.5-flash", # Faster and cheaper for code analysis
             contents=prompt,
@@ -44,5 +44,5 @@ def analyze_code(code):
         return "Analysis completed but no text was generated."
         
     except Exception as e:
-        print(f"❌ Code Analysis Error: {e}")
+        print(f" Code Analysis Error: {e}")
         return f"Code analysis failed: {str(e)}"

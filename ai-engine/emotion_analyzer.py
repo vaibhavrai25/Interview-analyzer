@@ -13,7 +13,7 @@ def get_detector():
             # Lazy loading the model only when first needed
             _detector = FER(mtcnn=True)
         except Exception as e:
-            print(f"⚠️ Emotion Engine Fallback: {e}")
+            print(f" Emotion Engine Fallback: {e}")
             class FallbackFER:
                 def detect_emotions(self, img): return []
             _detector = FallbackFER()

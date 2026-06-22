@@ -31,7 +31,7 @@ try:
     payments_collection.create_index([("razorpay_payment_id", ASCENDING)])
     payments_collection.create_index([("status", ASCENDING)])
 except Exception as e:
-    print(f"⚠️ Mongo index warning: {e}")
+    print(f" Mongo index warning: {e}")
 
 
 CREDIT_PACKS = {
@@ -257,7 +257,7 @@ def save_interview(
     user_email: str = None,
 ):
     if report is None:
-        print("❌ Cannot save: Report is None")
+        print(" Cannot save: Report is None")
         return None
 
     final_id = interview_id if interview_id else str(uuid.uuid4())
@@ -291,10 +291,10 @@ def save_interview(
             {"$setOnInsert": document},
             upsert=True,
         )
-        print(f"✅ Successfully saved to Mongo! ID: {final_id}")
+        print(f" Successfully saved to Mongo! ID: {final_id}")
         return final_id
     except Exception as e:
-        print(f"❌ Mongo Save Error: {e}")
+        print(f" Mongo Save Error: {e}")
         return None
 
 
@@ -309,7 +309,7 @@ def update_interview_status(interview_id: str, status: str, duration: str = None
             {"$set": update_data},
         )
     except Exception as e:
-        print(f"❌ Status Update Error: {e}")
+        print(f" Status Update Error: {e}")
 
 
 def update_interview(interview_id: str, data: dict):
@@ -322,7 +322,7 @@ def update_interview(interview_id: str, data: dict):
         )
         return result.matched_count > 0
     except Exception as e:
-        print(f"❌ Update Error: {e}")
+        print(f" Update Error: {e}")
         return False
 
 
@@ -338,7 +338,7 @@ def delete_interview(interview_id: str):
         result = reports_collection.delete_one({"interview_id": interview_id})
         return result.deleted_count > 0
     except Exception as e:
-        print(f"❌ Delete Error: {e}")
+        print(f" Delete Error: {e}")
         return False
 
 
@@ -357,7 +357,7 @@ def get_all_interviews(user_email: str = None):
             item["_id"] = str(item["_id"])
             interviews.append(item)
     except Exception as e:
-        print(f"❌ Fetch Error: {e}")
+        print(f" Fetch Error: {e}")
 
     return interviews
 
@@ -369,5 +369,5 @@ def get_interview_by_id(interview_id: str):
             interview["_id"] = str(interview["_id"])
         return interview
     except Exception as e:
-        print(f"❌ Fetch Interview Error: {e}")
+        print(f" Fetch Interview Error: {e}")
         return None

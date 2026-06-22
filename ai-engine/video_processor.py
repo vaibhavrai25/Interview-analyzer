@@ -107,7 +107,7 @@ def upload_to_cloudinary(file_path, public_id):
             os.getenv("CLOUDINARY_API_SECRET"),
         ]
     ):
-        print("⚠️ Cloudinary env missing. Skipping upload.")
+        print(" Cloudinary env missing. Skipping upload.")
         return None
 
     compressed_path = f"{file_path}_compressed.mp4"
@@ -125,7 +125,7 @@ def upload_to_cloudinary(file_path, public_id):
             logger=None,
         )
 
-        print(f"☁️ Uploading to Cloudinary: {public_id}")
+        print(f" Uploading to Cloudinary: {public_id}")
 
         response = cloudinary.uploader.upload_large(
             compressed_path,
@@ -138,7 +138,7 @@ def upload_to_cloudinary(file_path, public_id):
         return response.get("secure_url")
 
     except Exception as e:
-        print(f"❌ Cloudinary upload failed: {e}")
+        print(f" Cloudinary upload failed: {e}")
         return None
 
     finally:
@@ -165,7 +165,7 @@ def get_video_metadata(video_path):
             if cap.isOpened():
                 break
 
-            print(f"⚠️ VideoCapture busy, retrying ({attempt + 1}/3)...")
+            print(f" VideoCapture busy, retrying ({attempt + 1}/3)...")
             time.sleep(1.5)
 
         if not cap or not cap.isOpened():
@@ -207,7 +207,7 @@ def process_video(video_path, interview_id):
 
     try:
         if not os.path.exists(video_path):
-            print(f"❌ Video file missing: {video_path}")
+            print(f" Video file missing: {video_path}")
             return None
 
         duration_seconds, duration_str, thumb_path = get_video_metadata(video_path)
@@ -277,7 +277,7 @@ def process_video(video_path, interview_id):
             raw_emotions = analyze_emotions_from_frames(frames_folder)
             emotion_report = summarize_emotions(raw_emotions, fps=1)
         except Exception as e:
-            print(f"⚠️ Emotion analysis failed: {e}")
+            print(f" Emotion analysis failed: {e}")
             emotion_report = {
                 "error": "Emotion analysis unavailable",
                 "dominant_emotion": "unknown",
@@ -302,7 +302,7 @@ def process_video(video_path, interview_id):
             try:
                 code_review = analyze_code(code_snapshot)
             except Exception as e:
-                print(f"⚠️ Code analysis failed: {e}")
+                print(f" Code analysis failed: {e}")
                 code_review = "Code analysis unavailable."
 
         update_interview_status(interview_id, "Compressing & Uploading...")
@@ -326,7 +326,7 @@ def process_video(video_path, interview_id):
         }
 
     except Exception as e:
-        print(f"🔥 NEURAL PIPELINE CRASH: {e}")
+        print(f" PIPELINE CRASH: {e}")
         update_interview_status(interview_id, f"Error in Analysis: {str(e)[:100]}")
         return None
 

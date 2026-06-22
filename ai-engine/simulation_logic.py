@@ -113,10 +113,10 @@ async def groq_with_fallback(messages, fallback_text, temperature=0.42, max_toke
         return response.choices[0].message.content.strip()
 
     except asyncio.TimeoutError:
-        print("⚠️ Quality model timeout. Trying fast fallback model...")
+        print(" Quality model timeout. Trying fast fallback model...")
 
     except Exception as e:
-        print(f"⚠️ Quality model failed: {e}. Trying fast fallback model...")
+        print(f" Quality model failed: {e}. Trying fast fallback model...")
 
     try:
         response = await groq_chat_completion(
@@ -129,7 +129,7 @@ async def groq_with_fallback(messages, fallback_text, temperature=0.42, max_toke
         return response.choices[0].message.content.strip()
 
     except Exception as e:
-        print(f"⚠️ Fast fallback model failed: {e}")
+        print(f" Fast fallback model failed: {e}")
 
     return fallback_text
 

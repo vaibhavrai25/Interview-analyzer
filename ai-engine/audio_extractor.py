@@ -11,7 +11,7 @@ def extract_audio_from_video(video_path):
     """
 
     if not video_path or not os.path.exists(video_path):
-        print(f"❌ Video file not found for audio extraction: {video_path}")
+        print(f" Video file not found for audio extraction: {video_path}")
         return None
 
     base_name = os.path.splitext(video_path)[0]
@@ -42,20 +42,20 @@ def extract_audio_from_video(video_path):
         )
 
         if result.returncode != 0:
-            print("❌ FFmpeg audio extraction failed:")
+            print(" FFmpeg audio extraction failed:")
             print(result.stderr[-1200:] if result.stderr else "No stderr")
             return None
 
         if not os.path.exists(audio_path) or os.path.getsize(audio_path) == 0:
-            print("❌ Audio extraction produced empty file.")
+            print(" Audio extraction produced empty file.")
             return None
 
         return audio_path
 
     except FileNotFoundError:
-        print("❌ ffmpeg not found. Please install ffmpeg and add it to PATH.")
+        print(" ffmpeg not found. Please install ffmpeg and add it to PATH.")
         return None
 
     except Exception as e:
-        print(f"❌ Error extracting audio: {e}")
+        print(f" Error extracting audio: {e}")
         return None

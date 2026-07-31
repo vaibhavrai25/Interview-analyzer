@@ -8,6 +8,7 @@ function backendToWsUrl(baseUrl) {
 }
 
 // Converts standard ArrayBuffer to Base64 for the websocket payload
+// when we take the mic input, convert audio to PCM16, and send it to the backend, we need to encode it as Base64 to send it over the websocket as a string. The backend will decode it back to PCM16 for processing.
 function arrayBufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
   let binary = "";
@@ -21,7 +22,8 @@ function arrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 
-// Converts Base64 incoming payload from WebSocket to ArrayBuffer for audio decoding
+// Converts Base64 incoming payload from WebSocket to ArrayBuffer for audio decoding 
+// websocket send data as string but browser audio APIs require ArrayBuffer to play the audio
 function base64ToArrayBuffer(base64) {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
@@ -34,6 +36,7 @@ function base64ToArrayBuffer(base64) {
 }
 
 // Safely extracts the sample rate from Gemini's incoming mimeType (usually 24000)
+
 function parseRateFromMimeType(mimeType, fallback = 24000) {
   const match = String(mimeType || "").match(/rate=(\d+)/);
   if (!match) return fallback;
@@ -113,7 +116,7 @@ export class GeminiLiveVoiceClient {
     const wsBase = backendToWsUrl(DEFAULT_BACKEND_URL);
     return `${wsBase}/gemini/live/ws/${encodeURIComponent(this.interviewId)}`;
   }
-
+  // Safely initializes the Web Audio API only when needed to bypass browser autoplay restrictions and resets the audio scheduler clock.
   ensurePlaybackContext(sampleRate = 24000) {
     if (!this.playbackContext || this.playbackContext.state === "closed") {
       this.playbackContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate });
@@ -123,12 +126,12 @@ export class GeminiLiveVoiceClient {
     }
     return this.playbackContext;
   }
-
+  // Routes the AI's raw audio into a flexible virtual stream so your React frontend can easily play it, mute it, or visualize it using a standard <audio> element.
   getAssistantAudioStream() {
     this.ensurePlaybackContext(24000);
     return this.playbackDestination.stream;
   }
-
+  //Sends a tiny, automated message to the server every 8 seconds to prevent network firewalls from disconnecting the WebSocket during silent periods of the interview.
   startHeartbeat() {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => {
@@ -139,14 +142,14 @@ export class GeminiLiveVoiceClient {
       } catch (_) {}
     }, 8000);
   }
-
+  // this function stops the heartbeat timer that was started to keep the WebSocket connection alive. It clears the interval and sets the heartbeatTimer to null.
   stopHeartbeat() {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
     }
   }
-
+  // This function marks the assistant as currently speaking and sets a fallback timer to reset the speaking state if no audio sources are active after 1.2 seconds. It clears any existing speech end timer before setting a new one.
   markAssistantSpeaking() {
     this.isAssistantCurrentlySpeaking = true;
 
@@ -159,7 +162,9 @@ export class GeminiLiveVoiceClient {
       }
     }, 1200);
   }
-
+  // This function resets the playback scheduler after a short delay of 700 milliseconds. 
+  // It clears any existing scheduler reset timer and sets a new one. 
+  // If there are no active audio sources when the timer fires, it resets the next playback time to 0 and marks that the assistant is not currently speaking.
   resetPlaybackSchedulerSoon() {
     clearTimeout(this.schedulerResetTimer);
 
@@ -170,7 +175,9 @@ export class GeminiLiveVoiceClient {
       }
     }, 700);
   }
-
+  // This function stops all currently scheduled assistant audio playback. 
+  // It increments the audio response generation counter, stops each active audio source, clears the set of active audio sources, resets the next playback time and audio chunk counter, and marks that the assistant is not currently speaking.
+  //  It also clears any existing speech end and scheduler reset timers.
   stopAllScheduledAssistantAudio() {
     this.audioResponseGeneration += 1;
 
@@ -191,18 +198,21 @@ export class GeminiLiveVoiceClient {
   }
 
   async connect() {
+    // If the WebSocket is already open, we don't need to reconnect.
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+    
 
+    // Reset connection state
     this.closedByUser = false;
     this.audioResponseGeneration = 0;
     this.audioChunkCounter = 0;
     this.nextPlaybackTime = 0;
     this.onStatus("Opening Gemini backend WebSocket...");
-
+    // Return a promise that resolves when the connection is established or rejects on error/timeout
     return new Promise((resolve, reject) => {
       this.connectPromiseResolve = resolve;
       this.connectPromiseReject = reject;
-
+      // Set a timeout to reject the promise if the connection doesn't establish within 35 seconds
       this.connectionTimeout = setTimeout(() => {
         if (!this.hasStartedMic) {
           const error = new Error("Gemini backend WebSocket timeout.");
@@ -212,16 +222,16 @@ export class GeminiLiveVoiceClient {
           this.disconnect();
         }
       }, 35000);
-
+      // Initialize the WebSocket connection to the backend
       this.ws = new WebSocket(this.getWsUrl());
-
+      // Set up event handlers for the WebSocket
       this.ws.onopen = () => {
         this.isConnected = true;
         this.startHeartbeat();
         this.onStatus("Backend WebSocket connected. Sending Gemini setup...");
 
-        console.log("✅ Client WS connected, sending start message");
-
+        console.log(" Client WS connected, sending start message");
+        // Send a "start" message to the backend with user email and configuration
         this.ws.send(
           JSON.stringify({
             type: "start",
@@ -233,7 +243,7 @@ export class GeminiLiveVoiceClient {
           })
         );
       };
-
+      // Handle incoming messages from the backend WebSocket
       this.ws.onmessage = async (event) => {
         await this.handleBackendMessage(event);
 
@@ -242,7 +252,7 @@ export class GeminiLiveVoiceClient {
           this.safeResolve();
         }
       };
-
+      // Handle WebSocket errors by logging them, invoking the onError callback, and rejecting the connection promise if the connection wasn't closed by the user.
       this.ws.onerror = (error) => {
         console.error("❌ Gemini backend WS error:", error);
         if (!this.closedByUser) {
@@ -250,7 +260,7 @@ export class GeminiLiveVoiceClient {
           this.safeReject(new Error("Gemini backend WebSocket error."));
         }
       };
-
+      // Handle WebSocket closure by updating connection state, stopping the heartbeat, and invoking the onError callback if the connection was closed before the microphone started.
       this.ws.onclose = (event) => {
         this.isConnected = false;
         this.stopHeartbeat();
@@ -267,7 +277,7 @@ export class GeminiLiveVoiceClient {
       };
     });
   }
-
+  // Safely resolves the connection promise if it exists, and clears the resolve and reject handlers to prevent multiple invocations.
   safeResolve() {
     if (this.connectPromiseResolve) {
       this.connectPromiseResolve();
@@ -275,7 +285,7 @@ export class GeminiLiveVoiceClient {
       this.connectPromiseReject = null;
     }
   }
-
+  // Safely rejects the connection promise if it exists, and clears the resolve and reject handlers to prevent multiple invocations.
   safeReject(error) {
     if (this.connectPromiseReject) {
       this.connectPromiseReject(error);
@@ -283,18 +293,26 @@ export class GeminiLiveVoiceClient {
       this.connectPromiseReject = null;
     }
   }
-
+  // This function initializes the browser's SpeechRecognition API to capture and transcribe user speech in real-time.
+  //  It sets up event handlers for processing interim and final transcripts, sending them to the backend, and handling errors. 
+  // The function also ensures continuous recognition by restarting the recognition process if it ends unexpectedly.
   startSpeechRecognition() {
+    // Check if the browser supports the SpeechRecognition API
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return;
 
     this.speechRecognition = new SpeechRecognition();
     this.speechRecognition.continuous = true;
     this.speechRecognition.interimResults = true;
+    
 
+    // Handle the results from the speech recognition API, processing both interim and final transcripts.
+    //  Interim transcripts are sent to the onUserText callback with a type of "interim", while final transcripts are sent with a type of "final" and also logged to the backend if the WebSocket is open.
     this.speechRecognition.onresult = (event) => {
       let finalTranscript = "";
       let interimTranscript = "";
+
+
       
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
@@ -307,7 +325,7 @@ export class GeminiLiveVoiceClient {
       if (interimTranscript) {
         this.onUserText(interimTranscript.trim(), { type: "interim" });
       }
-      
+      // If a final transcript is available, send it to the onUserText callback and log it to the backend if the WebSocket is open.
       if (finalTranscript.trim()) {
         this.onUserText(finalTranscript.trim(), { type: "final" });
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -345,24 +363,31 @@ export class GeminiLiveVoiceClient {
     if (this.hasStartedMic) return;
 
     this.onStatus("Starting microphone stream...");
-
+    // If an external stream is provided, use it; otherwise, request microphone access from the user.
     if (this.externalStream) {
       this.stream = this.externalStream;
       this.ownsStream = false;
     } else {
+      // Request microphone access from the user with specific audio constraints for echo cancellation, noise suppression, and auto gain control.
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
         },
+        // Disable video to avoid unnecessary permissions and resource usage
         video: false,
       });
+      // Mark that this client owns the microphone stream and is responsible for stopping it when done.
       this.ownsStream = true;
     }
 
     // Force the browser to initialize native 16000Hz sampling
+    // why: Gemini backend expects 16kHz PCM audio for processing, and this ensures that the audio context is set up correctly for that sample rate.
     this.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    if (this.audioContext.state === "suspended") {
+      await this.audioContext.resume();
+    }
     
     // --- WORKLET INJECTION (Replaces Deprecated ScriptProcessorNode) ---
     // This runs the Float32 -> Int16 conversion and chunks it perfectly to 4096 samples 
@@ -451,6 +476,8 @@ export class GeminiLiveVoiceClient {
     try {
       const sampleRate = parseRateFromMimeType(mimeType, 24000);
       const playbackContext = this.ensurePlaybackContext(sampleRate);
+
+      
 
       if (playbackContext.state === "suspended") {
         await playbackContext.resume();
@@ -582,7 +609,7 @@ export class GeminiLiveVoiceClient {
       this.onTurnComplete(data);
     }
   }
-
+  
   sendText(text) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
 

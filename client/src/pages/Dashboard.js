@@ -383,7 +383,7 @@ export default function Dashboard() {
   useEffect(() => {
     refreshAll();
     return () => { if (pollTimer.current) clearInterval(pollTimer.current); };
-  }, [refreshAll, location.key]);
+  }, [ location.key]);
 
   const processedData = data.filter((itv) => hasValidAnalysis(itv));
   const sortedTrendData = [...processedData].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));

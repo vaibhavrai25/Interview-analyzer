@@ -393,6 +393,26 @@ export default function GeminiLiveInterviewRoom() {
     [config.company, config.role, interviewId, updateStatus]
   );
 
+  // NEW FIX: Manual trigger to check code
+  const handleManualCodeCheck = useCallback(() => {
+    const cleanCode = codeRef.current.trim();
+    
+    if (cleanCode.length < MIN_CODE_SNAPSHOT_LENGTH) {
+      updateStatus("Please write some code before checking.");
+      return;
+    }
+
+    lastSentCodeRef.current = cleanCode;
+
+    clientRef.current?.sendCodeSnapshot(cleanCode, {
+      role: config.role || "Candidate",
+      company: config.company || "",
+      interview_id: interviewId,
+    });
+
+    updateStatus("Code snapshot sent for AI review.");
+  }, [config.company, config.role, interviewId, updateStatus]);
+
   const endInterview = useCallback(async () => {
     if (endedRef.current) return;
 
@@ -801,7 +821,17 @@ export default function GeminiLiveInterviewRoom() {
                 Auto-syncs to interviewer
               </p>
             </div>
-            <div className="w-2 h-2 rounded-full bg-blue-500/50 animate-pulse" />
+            
+            {/* NEW FIX: Added Check Code Button Here */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleManualCodeCheck}
+                className="bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)] border border-blue-400/30"
+              >
+                Check Code
+              </button>
+              <div className="w-2 h-2 rounded-full bg-blue-500/50 animate-pulse" />
+            </div>
           </div>
           <Editor
             height="100%"

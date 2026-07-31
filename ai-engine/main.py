@@ -5,6 +5,7 @@ import json
 import socketio
 import cloudinary
 import cloudinary.uploader
+import subprocess
 
 from uuid import uuid4
 from datetime import datetime, timezone
@@ -151,6 +152,24 @@ def safe_json_loads(value, fallback):
         return json.loads(value)
     except Exception:
         return fallback
+
+
+def fix_webm_duration(input_path: str, output_path: str):
+    """
+    Passes a raw browser WebM stream through FFmpeg without re-encoding to
+    dynamically generate the missing duration metadata container needed by MoviePy.
+    """
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", input_path, "-c", "copy", output_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True
+        )
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.decode("utf-8") if e.stderr else str(e)
+        print(f"FFmpeg failed to fix WebM structural metadata: {error_msg}")
+        raise HTTPException(status_code=500, detail="Failed to sanitize video stream container.")
 
 
 def build_basic_live_scores(transcript_items, code_snapshot):
@@ -810,17 +829,28 @@ async def analyze_live_interview(
         if not user_email:
             raise HTTPException(status_code=400, detail="User email is required.")
 
+        raw_filename = f"raw_{interview_id}.webm"
+        raw_video_path = os.path.join("videos", raw_filename)
         video_filename = f"{interview_id}.webm"
         video_location = os.path.join("videos", video_filename)
+        
         contents = await video.read()
 
         if not contents:
             raise HTTPException(status_code=400, detail="Uploaded live interview video is empty.")
 
-        with open(video_location, "wb") as buffer:
+        # Write the unindexed temporary buffer safely
+        with open(raw_video_path, "wb") as buffer:
             buffer.write(contents)
             buffer.flush()
             os.fsync(buffer.fileno())
+
+        # Intercept and heal the WebM container layout with FFmpeg prior to background tasks
+        try:
+            fix_webm_duration(raw_video_path, video_location)
+        finally:
+            if os.path.exists(raw_video_path):
+                os.remove(raw_video_path)
 
         transcript_items = safe_json_loads(transcript, [])
         preliminary_score = build_basic_live_scores(transcript_items, code_snapshot)

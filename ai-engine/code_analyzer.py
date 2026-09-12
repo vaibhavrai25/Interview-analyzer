@@ -1,10 +1,11 @@
 import os
 from dotenv import load_dotenv
+load_dotenv()
 
 from google import genai
 from google.genai import types
 
-load_dotenv()
+
 
 # Initialize the modern Client
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -32,7 +33,7 @@ def analyze_code(code):
     try:
         
         response = client.models.generate_content(
-            model="gemini-1.5-flash", # Faster and cheaper for code analysis
+            model="gemini-3.6-flash", # Faster and cheaper for code analysis
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.4, # Lower temperature for factual technical analysis

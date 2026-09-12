@@ -3,18 +3,43 @@ import shutil
 import cv2
 import time
 import json
+import subprocess
 import cloudinary.uploader
 
 from moviepy.editor import VideoFileClip
+from groq import Groq
 
 from audio_extractor import extract_audio_from_video
 from frame_extractor import extract_frames_from_video
 from emotion_analyzer import analyze_emotions_from_frames
-from speech_to_text import transcribe_audio
 from emotion_summary import summarize_emotions
 from qa_extractor import extract_qa_pairs
 from analyzer import analyze_text, analyze_code
 from database import update_interview_status, get_interview_by_id
+
+# Initialize Groq Client for Cloud STT
+groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+
+def transcribe_audio(audio_path):
+    """
+    Transcribes audio using Groq's high-speed Whisper API instead of local models.
+    This bypasses the memory constraints of Render's free tier entirely.
+    """
+    if not audio_path or not os.path.exists(audio_path):
+        return ""
+        
+    try:
+        with open(audio_path, "rb") as audio_file:
+            transcription = groq_client.audio.transcriptions.create(
+                file=(os.path.basename(audio_path), audio_file.read()),
+                model="whisper-large-v3-turbo",
+                response_format="json"
+            )
+            return transcription.text
+    except Exception as e:
+        print(f" Groq API Transcription failed: {e}")
+        return ""
 
 
 def normalize_transcript_to_text(transcript):
@@ -62,6 +87,7 @@ def normalize_transcript_to_text(transcript):
 def build_live_qa_analysis(live_questions, live_answers):
     qa_analysis = []
 
+    # Ensure both live_questions and live_answers are lists
     if not isinstance(live_questions, list):
         live_questions = []
 
@@ -111,18 +137,22 @@ def upload_to_cloudinary(file_path, public_id):
         return None
 
     compressed_path = f"{file_path}_compressed.mp4"
-    clip = None
 
     try:
         print(f"🗜️ Compressing Video: {public_id}")
 
-        clip = VideoFileClip(file_path)
-        clip.write_videofile(
-            compressed_path,
-            bitrate="1000k",
-            audio_codec="aac",
-            verbose=False,
-            logger=None,
+        # Replaced Memory-Heavy MoviePy with Zero-RAM FFmpeg Subprocess
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", file_path,
+                "-vcodec", "libx264", "-crf", "28", # Good compression, low RAM
+                "-preset", "veryfast", # Speed up processing
+                "-acodec", "aac", "-b:a", "64k",
+                compressed_path
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True
         )
 
         print(f" Uploading to Cloudinary: {public_id}")
@@ -142,12 +172,6 @@ def upload_to_cloudinary(file_path, public_id):
         return None
 
     finally:
-        try:
-            if clip:
-                clip.close()
-        except Exception:
-            pass
-
         if os.path.exists(compressed_path):
             try:
                 os.remove(compressed_path)
@@ -230,8 +254,7 @@ def process_video(video_path, interview_id):
             audio_path = extract_audio_from_video(video_path)
 
             if audio_path:
-                transcript_segments = transcribe_audio(audio_path)
-                full_text = normalize_transcript_to_text(transcript_segments)
+                full_text = transcribe_audio(audio_path)
             else:
                 full_text = ""
 

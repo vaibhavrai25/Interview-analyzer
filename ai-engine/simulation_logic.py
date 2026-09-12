@@ -21,7 +21,7 @@ CODE_ANALYSIS_COOLDOWN_SECONDS = 18
 VOICE_MIN_LENGTH = 4
 GROQ_TIMEOUT_SECONDS = int(os.getenv("GROQ_TIMEOUT_SECONDS", "13"))
 
-QUALITY_MODEL = os.getenv("GROQ_INTERVIEW_MODEL", "llama-3.3-70b-versatile")
+QUALITY_MODEL = os.getenv("GROQ_INTERVIEW_MODEL", "llama-3.1-8b-instant")
 FAST_FALLBACK_MODEL = os.getenv("GROQ_FAST_MODEL", "llama-3.1-8b-instant")
 
 

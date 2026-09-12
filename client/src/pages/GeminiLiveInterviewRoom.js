@@ -81,19 +81,18 @@ export default function GeminiLiveInterviewRoom() {
   const location = useLocation();
 
   const config = useMemo(() => {
-    return (
-      location.state?.config || {
-        title: "Gemini Live Interview",
-        role: "Candidate",
-        company: "",
-        duration: 15,
-        interview_type: "custom",
-        resume_context: "",
-        topics: "",
-        difficulty: "medium",
-        interviewer_voice: "male_balanced",
-      }
-    );
+    const passedConfig = location.state?.config || {};
+    return {
+      title: passedConfig.title || "Gemini Live Interview",
+      role: passedConfig.role || "Candidate",
+      company: passedConfig.company || "Target Company", // Added default
+      duration: passedConfig.duration || 15,
+      interview_type: passedConfig.interview_type || "Technical SDE", // Added explicit default
+      resume_context: passedConfig.resume_context || passedConfig.resumeContext || "",
+      topics: passedConfig.topics || "General Software Engineering", // Added default
+      difficulty: passedConfig.difficulty || "medium",
+      interviewer_voice: passedConfig.interviewer_voice || "male_balanced",
+    };
   }, [location.state]);
 
   const initialInterviewIdRef = useRef(
@@ -563,9 +562,8 @@ export default function GeminiLiveInterviewRoom() {
         clientRef.current = client;
 
         const assistantAudioStream = client.getAssistantAudioStream();
-        startRecorder(cameraStream, assistantAudioStream);
-
-        await client.connect();
+        await client.connect(); // Wait for the backend and Gemini to connect first
+        startRecorder(cameraStream, assistantAudioStream); // Start recording only when ready
 
         if (!mountedRef.current) return;
 
@@ -772,9 +770,11 @@ export default function GeminiLiveInterviewRoom() {
                       {msg.role === "user" ? "You" : "Jarvis"}
                     </div>
                     {msg.role === "assistant" ? (
-                      <ReactMarkdown className="prose prose-invert prose-sm max-w-none">
-                        {msg.text}
-                      </ReactMarkdown>
+                      <div className="prose prose-invert prose-sm max-w-none">
+                       <ReactMarkdown>
+                          {msg.text}
+                       </ReactMarkdown>
+                      </div>
                     ) : (
                       <p className="whitespace-pre-wrap">{msg.text}</p>
                     )}

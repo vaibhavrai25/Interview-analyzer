@@ -8,7 +8,7 @@ load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 def analyze_code(code):
-    """Deep technical analysis of candidate code using Llama 3.3 70B"""
+    
     if not code or len(code.strip()) < 10:
         return "No significant code submitted for analysis."
     
@@ -30,13 +30,13 @@ def analyze_code(code):
     
     try:
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2 # Lower temperature for factual technical accuracy
         )
         return response.choices[0].message.content
     except Exception as e:
-        print(f" Groq Code Analysis Error: {e}")
+        print(f"Code Analysis Error: {e}")
         return f"Code analysis unavailable: {str(e)}"
 
 def analyze_text(text):
@@ -68,7 +68,7 @@ def analyze_text(text):
     
     try:
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1, # Extremely low temperature for consistent JSON output
             response_format={ "type": "json_object" }
@@ -94,7 +94,7 @@ def analyze_text(text):
         }
         
     except Exception as e:
-        print(f" Groq Text Analysis Error: {e}")
+        print(f"Text Analysis Error: {e}")
         # Robust fallback if AI fails
         return {
             "communication_score": 5,

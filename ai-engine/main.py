@@ -10,6 +10,7 @@ import subprocess
 from uuid import uuid4
 from datetime import datetime, timezone
 from dotenv import load_dotenv
+load_dotenv()
 
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException, Form, Query, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -60,7 +61,7 @@ try:
 except Exception:
     analyze_code = None
 
-load_dotenv()
+
 
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),

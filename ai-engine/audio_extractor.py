@@ -4,18 +4,16 @@ import subprocess
 
 def extract_audio_from_video(video_path):
     """
-    Extracts 16kHz mono WAV audio from a video file for Whisper/STT.
-
-    Uses ffmpeg directly instead of MoviePy to avoid noisy ffmpeg info logs and
-    random "At least one output file must be specified" messages.
+    Extracts audio from a video file for Groq Whisper API.
+    Uses 'aac' encoding to compress the audio footprint safely under the 25MB API limit,
+    guaranteeing that long interviews process smoothly on the cloud.
     """
-
     if not video_path or not os.path.exists(video_path):
         print(f" Video file not found for audio extraction: {video_path}")
         return None
 
     base_name = os.path.splitext(video_path)[0]
-    audio_path = f"{base_name}.wav"
+    audio_path = f"{base_name}.m4a"
 
     command = [
         "ffmpeg",
@@ -24,7 +22,9 @@ def extract_audio_from_video(video_path):
         video_path,
         "-vn",
         "-acodec",
-        "pcm_s16le",
+        "aac",
+        "-b:a",
+        "64k",  # Highly compressed, perfect for speech recognition
         "-ar",
         "16000",
         "-ac",

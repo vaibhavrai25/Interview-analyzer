@@ -92,37 +92,6 @@ def extract_resume_highlights(resume_context: str) -> str:
     if not text.strip():
         return "No resume details were provided."
 
-    try:
-        # Step 1: The Pre-Flight Extraction (Two-Pass Architecture)
-        # We use the fast, lightweight flash model to intelligently compress the context
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        
-        # gemini-2.0-flash has the highest free-tier quota (1,500 RPD) and is fully stable
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        
-        prompt = (
-            "You are an expert technical recruiter. Read this candidate's resume and extract "
-            "the 3 most impressive, concrete achievements, projects, or metrics. "
-            "Keep the total response extremely concise, under 50 words. "
-            "Do NOT use markdown, bolding, or bullet points. Just return a single line of plain text "
-            "with the achievements separated by the ' | ' character. "
-            f"Resume Context: {text[:3000]}" # Limit input size to save latency
-        )
-        
-        # This synchronous call executes in milliseconds before the WebSocket opens
-        response = model.generate_content(prompt)
-        
-        if response.text:
-            # Clean up any accidental line breaks from the LLM and compact it
-            clean_text = response.text.replace('\n', ' ')
-            return compact_text(clean_text, 300)
-            
-    except Exception as e:
-        # Step 2: The Graceful Fallback
-        # If the API limits out or network fails, we catch it silently so the interview still starts.
-        print(f"Pre-flight extraction failed, using heuristic fallback: {e}")
-        pass
-
     # Fallback heuristic: No hardcoded tech stacks, just grabs substantive sentences
     highlights = []
     sentences = re.split(r"[\n\r.]+", text)
@@ -148,37 +117,6 @@ def infer_role_profile(role: str, interview_type: str = "", topics: str = ""):
             "focus": "resume claims, problem-solving, communication",
             "style": "Ask general behavioral and experience-based questions."
         }
-
-    try:
-        # Step 1: Dynamic LLM Generation
-        # gemini-2.0-flash is fast enough to do this in milliseconds and has high free-tier limits
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        
-        prompt = (
-            "You are an expert recruiter configuring an AI interviewer. "
-            f"Candidate's target profile: '{raw}'\n"
-            "Return a JSON object with exactly 3 keys:\n"
-            '"type": The formal interview title (e.g., "Full Stack Engineering Interview")\n'
-            '"focus": A comma-separated list of 5-7 specific technical or core topics to assess.\n'
-            '"style": A 1-sentence instruction on how the interviewer should question the candidate.\n'
-            "Output ONLY valid JSON. Do not include markdown code blocks like ```json."
-        )
-        
-        response = model.generate_content(prompt)
-        
-        # Clean up any accidental markdown formatting the LLM might add
-        clean_text = response.text.replace("```json", "").replace("```", "").strip()
-        profile_data = json.loads(clean_text)
-        
-        # Validate that the LLM returned the exact keys we need before trusting it
-        if all(k in profile_data for k in ["type", "focus", "style"]):
-            return profile_data
-
-    except Exception as e:
-        # Step 2: The Graceful Fallback
-        # If the API fails or returns bad JSON, we fall back to a safe heuristic
-        print(f"Dynamic role inference failed, using fallback: {e}")
-        pass
 
     # --- THE FALLBACK HEURISTIC ---
     if any(x in raw for x in ["sde", "software", "developer", "backend", "frontend", "react"]):

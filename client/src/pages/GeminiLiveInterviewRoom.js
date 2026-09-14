@@ -10,6 +10,7 @@ import {
   Radio,
   Camera,
   VideoOff,
+  Maximize,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -20,6 +21,23 @@ import {
   getUserEmail,
 } from "../services/api";
 import { GeminiLiveVoiceClient } from "../services/geminiLiveVoice";
+
+// Suppress benign ResizeObserver errors caused by Monaco Editor during rapid window resizing
+if (typeof window !== "undefined") {
+  const originalError = window.console.error;
+  window.console.error = (...args) => {
+    if (args[0] && typeof args[0] === "string" && args[0].includes("ResizeObserver loop")) {
+      return;
+    }
+    originalError.call(window.console, ...args);
+  };
+
+  window.addEventListener("error", (e) => {
+    if (e.message === "ResizeObserver loop limit exceeded" || e.message.includes("undelivered notifications")) {
+      e.stopImmediatePropagation();
+    }
+  });
+}
 
 loader.config({
   paths: {
@@ -138,6 +156,58 @@ export default function GeminiLiveInterviewRoom() {
   const [timeLeft, setTimeLeft] = useState(Number(config.duration || 15) * 60);
   const [error, setError] = useState("");
   const [cameraReady, setCameraReady] = useState(false);
+  const [leftWidth, setLeftWidth] = useState(45);
+  const [topHeight, setTopHeight] = useState(50);
+  const [language, setLanguage] = useState("javascript");
+  
+  const isDraggingLeftRef = useRef(false);
+  const isDraggingTopRef = useRef(false);
+
+  const startDraggingLeft = useCallback((e) => {
+    e.preventDefault();
+    isDraggingLeftRef.current = true;
+    document.body.style.cursor = "col-resize";
+  }, []);
+
+  const startDraggingTop = useCallback((e) => {
+    e.preventDefault();
+    isDraggingTopRef.current = true;
+    document.body.style.cursor = "row-resize";
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (isDraggingLeftRef.current) {
+        const newWidth = (e.clientX / window.innerWidth) * 100;
+        if (newWidth > 20 && newWidth < 70) setLeftWidth(newWidth);
+      }
+      if (isDraggingTopRef.current) {
+        const newHeight = (e.clientY / window.innerHeight) * 100;
+        if (newHeight > 20 && newHeight < 80) setTopHeight(newHeight);
+      }
+    };
+    const handleMouseUp = () => {
+      isDraggingLeftRef.current = false;
+      isDraggingTopRef.current = false;
+      document.body.style.cursor = "default";
+    };
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
 
   const user = getStoredUser();
   const userEmail = user?.email || getUserEmail();
@@ -493,6 +563,7 @@ export default function GeminiLiveInterviewRoom() {
           company: config.company || "",
           duration: Number(config.duration || 15),
           resumeContext: config.resume_context || config.resumeContext || "",
+          jdContext: config.jd_context || config.jdContext || "",
           topics: config.topics || "",
           difficulty: config.difficulty || "medium",
           interviewerVoice: config.interviewer_voice || "male_balanced",
@@ -656,53 +727,12 @@ export default function GeminiLiveInterviewRoom() {
         )}
       </AnimatePresence>
 
-      <div className="relative z-10 p-4 flex justify-between items-center bg-black/40 border-b border-white/5 shadow-md">
-        <div className="flex items-center gap-4">
-          <div className="px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 font-mono font-bold flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            {Math.floor(timeLeft / 60)}:
-            {(timeLeft % 60).toString().padStart(2, "0")}
-          </div>
-
-          <div>
-            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-              {config.title || config.role || "Gemini Live Interview"}
-            </p>
-
-            <p className="text-[10px] text-emerald-300 mt-1 flex items-center gap-1">
-              <Radio size={10} /> {status}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={toggleMute}
-            className={`px-5 py-2 rounded-full font-black uppercase text-[10px] flex items-center gap-2 transition-all ${
-              isMuted
-                ? "bg-yellow-600 hover:bg-yellow-500"
-                : "bg-emerald-600 hover:bg-emerald-500"
-            }`}
-          >
-            {isMuted ? <MicOff size={14} /> : <Mic size={14} />}
-            {isMuted ? "Unmute" : "Mute"}
-          </button>
-
-          <button
-            onClick={endInterview}
-            disabled={isSyncing}
-            className="bg-rose-600 hover:bg-rose-500 disabled:opacity-60 px-6 py-2 rounded-full font-black uppercase text-[10px] flex items-center gap-2 transition-all"
-          >
-            <PhoneOff size={14} /> End Session
-          </button>
-        </div>
-      </div>
-
-      <div className="relative z-10 flex-1 flex overflow-hidden p-4 gap-4">
-        {/* Main Content Area - Video & Transcript (65%) */}
-        <div className="flex-1 flex flex-col gap-4">
-          {/* Video Area */}
-          <div className="glass-card h-[55%] rounded-[2rem] overflow-hidden bg-black border border-white/10 relative shadow-2xl">
+      <div className="relative z-10 flex-1 flex overflow-hidden p-4 gap-3">
+        {/* Left Panel - Control Center */}
+        <div style={{ width: `${leftWidth}%` }} className="flex flex-col gap-4">
+          
+          {/* Video Area (Embedded controls) */}
+          <div style={{ height: `calc(${topHeight}% - 6px)` }} className="glass-card rounded-[2rem] overflow-hidden bg-[#0a0a0a] border border-white/10 relative shadow-xl">
             <video
               ref={videoRef}
               autoPlay
@@ -720,18 +750,65 @@ export default function GeminiLiveInterviewRoom() {
               </div>
             )}
 
-            <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center">
-              <div className="px-3 py-1.5 rounded-full bg-black/70 border border-white/10 text-[10px] font-black uppercase text-emerald-300 flex items-center gap-2 backdrop-blur-sm">
-                <Camera size={12} /> Recording
+            {/* Top Video Overlay: Timer and Status */}
+            <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+              <div className="px-3 py-1.5 rounded-full bg-black/60 border border-white/10 text-[11px] font-mono font-bold text-white flex items-center gap-2 shadow-md">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                {Math.floor(timeLeft / 60)}:
+                {(timeLeft % 60).toString().padStart(2, "0")}
               </div>
+              
+              <div className="flex flex-col items-end">
+                <div className="px-3 py-1 bg-black/60 border border-white/10 rounded-full text-[9px] font-black uppercase text-emerald-400 flex items-center gap-1.5 shadow-md">
+                  <Radio size={10} /> {status}
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Video Overlay: Controls */}
+            <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-3">
+              <button
+                onClick={toggleMute}
+                className={`p-3 rounded-full shadow-lg transition-colors border border-white/10 ${
+                  isMuted
+                    ? "bg-yellow-600 hover:bg-yellow-500 text-white"
+                    : "bg-black/60 hover:bg-black/40 text-slate-200"
+                }`}
+                title={isMuted ? "Unmute" : "Mute"}
+              >
+                {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
+              </button>
+
+              <button
+                onClick={endInterview}
+                disabled={isSyncing}
+                className="bg-red-600 hover:bg-red-500 disabled:opacity-60 p-3 rounded-full shadow-lg transition-colors text-white border border-red-400/30"
+                title="End Interview"
+              >
+                <PhoneOff size={18} />
+              </button>
+            </div>
+            
+            <div className="absolute bottom-4 left-4">
+               <div className="px-2 py-1 rounded-md bg-black/60 text-[9px] font-black uppercase text-slate-300 border border-white/5">
+                 Candidate
+               </div>
             </div>
           </div>
 
-          {/* Transcript Chat Area - Classy WhatsApp Style */}
-          <div className="flex-1 glass-card border border-white/10 bg-[#0a0a0a]/80 backdrop-blur-xl rounded-[2rem] flex flex-col overflow-hidden shadow-2xl">
+          {/* Vertical Resizer Handle (for Video/Chat split) */}
+          <div
+            onMouseDown={startDraggingTop}
+            className="h-1.5 hover:h-2 cursor-row-resize hover:bg-white/10 rounded-full transition-all flex items-center justify-center group flex-shrink-0"
+          >
+            <div className="h-0.5 w-12 bg-white/10 group-hover:bg-white/40 rounded-full transition-colors" />
+          </div>
+
+          {/* Transcript Chat Area - WhatsApp Style */}
+          <div style={{ height: `calc(${100 - topHeight}% - 6px)` }} className="glass-card border border-white/10 bg-[#0a0a0a]/80 backdrop-blur-xl rounded-[2rem] flex flex-col overflow-hidden shadow-xl">
             <div className="p-4 border-b border-white/5 flex items-center justify-between bg-black/40">
               <span className="font-black text-[11px] uppercase tracking-widest text-slate-200">
-                Live Conversation
+                Live Chat
               </span>
 
               <div
@@ -741,7 +818,7 @@ export default function GeminiLiveInterviewRoom() {
               />
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar flex flex-col">
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col">
               {chat.length === 0 && !isJarvisSpeaking && (
                 <div className="flex-1 flex items-center justify-center text-xs text-slate-500 italic">
                   Conversation will appear here...
@@ -753,24 +830,24 @@ export default function GeminiLiveInterviewRoom() {
                   layout
                   initial={{ opacity: 0, y: 15, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ duration: 0.3, type: "spring", bounce: 0.3 }}
+                  transition={{ duration: 0.2 }}
                   key={`${msg.role}-${msg.time}-${index}`}
-                  className={`flex w-full mb-4 ${
+                  className={`flex w-full mb-3 ${
                     msg.role === "user" ? "justify-end" : "justify-start"
                   }`}
                 >
                   <div
-                    className={`relative max-w-[80%] px-4 py-3 text-[13.5px] leading-relaxed shadow-lg ${
+                    className={`relative max-w-[85%] px-3 py-2 text-[13px] leading-relaxed shadow-sm ${
                       msg.role === "user"
-                        ? "bg-emerald-600 text-[#e9edef] rounded-2xl rounded-tr-sm border border-emerald-500/30"
+                        ? "bg-slate-700 text-[#e9edef] rounded-2xl rounded-tr-sm border border-slate-600/30"
                         : "bg-slate-800 text-[#e9edef] rounded-2xl rounded-tl-sm border border-slate-700/30"
                     }`}
                   >
-                    <div className="font-bold text-[10.5px] mb-1 opacity-70 tracking-wide text-emerald-200">
+                    <div className="font-bold text-[9.5px] mb-0.5 opacity-60 tracking-wide text-emerald-200">
                       {msg.role === "user" ? "You" : "Jarvis"}
                     </div>
                     {msg.role === "assistant" ? (
-                      <div className="prose prose-invert prose-sm max-w-none">
+                      <div className="prose prose-invert prose-sm max-w-none text-[12.5px]">
                        <ReactMarkdown>
                           {msg.text}
                        </ReactMarkdown>
@@ -778,9 +855,6 @@ export default function GeminiLiveInterviewRoom() {
                     ) : (
                       <p className="whitespace-pre-wrap">{msg.text}</p>
                     )}
-                    <div className="text-[9.5px] opacity-40 mt-1 text-right flex justify-end gap-1 items-center">
-                      {formatTime(msg.time)}
-                    </div>
                   </div>
                 </motion.div>
               ))}
@@ -790,16 +864,16 @@ export default function GeminiLiveInterviewRoom() {
                   layout
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex w-full mb-4 justify-start"
+                  className="flex w-full mb-3 justify-start"
                 >
-                  <div className="relative max-w-[80%] px-4 py-3 rounded-2xl rounded-tl-sm text-[13px] shadow-lg bg-slate-800 text-slate-200 border border-purple-500/20">
-                    <div className="font-bold text-[10.5px] mb-1 opacity-70 tracking-wide text-emerald-200">
+                  <div className="relative max-w-[80%] px-3 py-2 rounded-2xl rounded-tl-sm text-[12px] shadow-sm bg-slate-800 text-slate-200 border border-slate-700/30">
+                    <div className="font-bold text-[9.5px] mb-0.5 opacity-60 tracking-wide text-emerald-200">
                       Jarvis
                     </div>
-                    <div className="flex items-center gap-2 opacity-80 mt-2 mb-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse delay-75" />
-                      <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse delay-150" />
-                      <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse delay-300" />
+                    <div className="flex items-center gap-1.5 opacity-80 mt-1 mb-0.5">
+                      <div className="w-1 h-1 rounded-full bg-slate-400 animate-pulse delay-75" />
+                      <div className="w-1 h-1 rounded-full bg-slate-400 animate-pulse delay-150" />
+                      <div className="w-1 h-1 rounded-full bg-slate-400 animate-pulse delay-300" />
                     </div>
                   </div>
                 </motion.div>
@@ -810,32 +884,59 @@ export default function GeminiLiveInterviewRoom() {
           </div>
         </div>
 
-        {/* Code Editor Area */}
-        <div className="w-[35%] glass-card overflow-hidden border border-white/5 bg-[#0a0a0a] rounded-[2rem] flex flex-col shadow-2xl">
-          <div className="p-3 border-b border-white/5 bg-black/40 flex justify-between items-center">
+        {/* Resizer Handle */}
+        <div
+          onMouseDown={startDraggingLeft}
+          className="w-1.5 hover:w-2 cursor-col-resize hover:bg-white/10 rounded-full transition-all flex items-center justify-center group flex-shrink-0"
+        >
+          <div className="w-0.5 h-12 bg-white/10 group-hover:bg-white/40 rounded-full transition-colors" />
+        </div>
+
+        {/* Right Panel - Code Editor Area */}
+        <div style={{ width: `calc(${100 - leftWidth}% - 12px)` }} className="glass-card overflow-hidden border border-white/10 bg-[#0a0a0a] rounded-[2rem] flex flex-col shadow-xl">
+          <div className="p-3 px-5 border-b border-white/5 bg-black/40 flex justify-between items-center">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-widest text-slate-300">
+              <p className="text-[12px] font-black uppercase tracking-widest text-slate-300">
                 Code Editor
               </p>
-              <p className="text-[9px] text-slate-500 mt-1">
+              <p className="text-[10px] text-slate-500 mt-0.5">
                 Auto-syncs to interviewer
               </p>
             </div>
             
-            {/* NEW FIX: Added Check Code Button Here */}
             <div className="flex items-center gap-3">
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="bg-black/40 border border-white/10 text-slate-300 text-[10px] uppercase font-black tracking-wider rounded-lg px-2 py-1.5 outline-none cursor-pointer hover:bg-black/60 transition-colors"
+              >
+                <option value="javascript">JavaScript</option>
+                <option value="typescript">TypeScript</option>
+                <option value="python">Python</option>
+                <option value="cpp">C++</option>
+                <option value="java">Java</option>
+              </select>
+
               <button
                 onClick={handleManualCodeCheck}
-                className="bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)] border border-blue-400/30"
+                className="bg-slate-800 hover:bg-slate-700 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-slate-200 transition-colors border border-slate-600/30 shadow-sm"
               >
                 Check Code
               </button>
-              <div className="w-2 h-2 rounded-full bg-blue-500/50 animate-pulse" />
+              
+              <button
+                onClick={toggleFullScreen}
+                className="bg-black/40 hover:bg-black/60 p-1.5 rounded-lg text-slate-300 transition-colors border border-white/10"
+                title="Toggle Fullscreen"
+              >
+                <Maximize size={16} />
+              </button>
             </div>
           </div>
           <Editor
             height="100%"
-            defaultLanguage="cpp"
+            defaultLanguage={language}
+            language={language}
             theme="vs-dark"
             value={code}
             onChange={setCode}
@@ -845,13 +946,13 @@ export default function GeminiLiveInterviewRoom() {
               });
             }}
             options={{
-              fontSize: 13.5,
+              fontSize: 14,
               fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
               minimap: { enabled: false },
               wordWrap: "on",
               scrollBeyondLastLine: false,
-              padding: { top: 15, bottom: 15 },
-              lineHeight: 22,
+              padding: { top: 20, bottom: 20 },
+              lineHeight: 24,
             }}
           />
         </div>

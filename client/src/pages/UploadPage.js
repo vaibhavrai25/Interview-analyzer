@@ -24,6 +24,7 @@ const UploadPage = () => {
   const [isParsing, setIsParsing] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [resumeText, setResumeText] = useState("");
+  const [jdText, setJdText] = useState("");
   const [creditInfo, setCreditInfo] = useState(null);
   const [error, setError] = useState("");
   const navigate = useNavigate();
@@ -91,7 +92,7 @@ const UploadPage = () => {
         reason: "live_interview_start",
         engine: "gemini",
       });
-      navigate("/pre-flight", { state: { config: { ...simConfig, resume_context: resumeText, user_email: user.email } } });
+      navigate("/pre-flight", { state: { config: { ...simConfig, resume_context: resumeText, jd_context: jdText, user_email: user.email } } });
     } catch (err) {
       setError(err?.message || "Insufficient allocation. Please purchase credits or claim a trial.");
       setIsSimulating(false);
@@ -227,6 +228,16 @@ const UploadPage = () => {
                     : "Click to upload resume for personalized questions"}
                 </span>
               </label>
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-slate-800">
+              <label className="text-xs font-semibold text-slate-400 mb-3 block">Job Description (Optional)</label>
+              <textarea 
+                value={jdText}
+                onChange={(e) => setJdText(e.target.value)}
+                placeholder="Paste the target Job Description here to allow the AI to cross-reference the candidate's skills..."
+                className="w-full h-28 bg-black/40 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500 transition-colors resize-none"
+              />
             </div>
 
             <div className="mt-6 rounded-md bg-slate-800/50 border border-slate-700 p-4 text-sm text-slate-300 flex items-center justify-between">

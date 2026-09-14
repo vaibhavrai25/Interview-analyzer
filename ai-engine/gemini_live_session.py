@@ -61,6 +61,7 @@ class GeminiLiveSessionRequest(BaseModel):
     company: str = ""
     duration: int = 15
     resume_context: str = ""
+    jd_context: str = ""
     topics: str = ""
     difficulty: str = "medium"
     interviewer_voice: str = "male_balanced"
@@ -96,8 +97,8 @@ def extract_resume_highlights(resume_context: str) -> str:
         # We use the fast, lightweight flash model to intelligently compress the context
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         
-        # gemini-3.6-flash is extremely fast and perfect for quick text operations
-        model = genai.GenerativeModel("gemini-3.6-flash")
+        # gemini-2.0-flash has the highest free-tier quota (1,500 RPD) and is fully stable
+        model = genai.GenerativeModel("gemini-2.0-flash")
         
         prompt = (
             "You are an expert technical recruiter. Read this candidate's resume and extract "
@@ -150,8 +151,8 @@ def infer_role_profile(role: str, interview_type: str = "", topics: str = ""):
 
     try:
         # Step 1: Dynamic LLM Generation
-        # gemini-3.6-flash is fast enough to do this in milliseconds
-        model = genai.GenerativeModel("gemini-3.6-flash")
+        # gemini-2.0-flash is fast enough to do this in milliseconds and has high free-tier limits
+        model = genai.GenerativeModel("gemini-2.0-flash")
         
         prompt = (
             "You are an expert recruiter configuring an AI interviewer. "
@@ -222,6 +223,18 @@ def sanitize_resume_context(raw_text: str, max_chars: int = 2000) -> str:
     
     return sanitized.strip()[:max_chars]
 
+def sanitize_jd_context(raw_text: str, max_chars: int = 2500) -> str:
+    """
+    Cleans the Job Description to prevent WebSocket context overload.
+    """
+    if not raw_text:
+        return ""
+    
+    sanitized = re.sub(r'\s+', ' ', raw_text)
+    sanitized = sanitized.encode('ascii', 'ignore').decode('ascii')
+    
+    return sanitized.strip()[:max_chars]
+
 def build_gemini_instructions(req: GeminiLiveSessionRequest) -> str:
     company = req.company or "the target organization"
     role = req.role or "Candidate"
@@ -235,6 +248,9 @@ def build_gemini_instructions(req: GeminiLiveSessionRequest) -> str:
 
     resume_highlights = extract_resume_highlights(req.resume_context)
     safe_full_resume = sanitize_resume_context(req.resume_context)
+    safe_jd = sanitize_jd_context(req.jd_context)
+    
+    jd_section = f"\n\n<job_description>\n{safe_jd}\n</job_description>\nCross-reference the candidate's resume with the job description to ask highly targeted role-fit questions." if safe_jd else ""
 
     return f"""
 You are a realistic human interviewer.
@@ -255,7 +271,7 @@ Role-specific interview strategy:
 {role_profile["style"]}
 
 Full candidate resume/context:
-{safe_full_resume}
+{safe_full_resume}{jd_section}
 
 Critical conversation rules:
 - Be fast and concise.
